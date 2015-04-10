@@ -8,10 +8,10 @@ int main(int argc, char *argv[]) {
         strcat(phrase, argv[i]);
         strcat(phrase, " ");
     }
-    return chinese_whisper(190, phrase);
+    return do_filtering(190, phrase);
 }
 
-int chinese_whisper(int repeat_times, char *whisper){
+int do_filtering(int repeat_times, char *whisper){
     pid_t pid;
     int my_pid;
     int parent_pid = getpid();
@@ -32,12 +32,12 @@ int chinese_whisper(int repeat_times, char *whisper){
         // close unused write end
         close (whisper_pipe[1]);
         // read from pipe
-        char* recieved_whisper = listen_to_whisper(whisper_pipe[0]);
+        char* recieved_whisper = get_next_line(whisper_pipe[0]);
         printf("pid:%i received string[%s]\n", my_pid, recieved_whisper);
         // close read end
         close(whisper_pipe[0]);
         if (repeat_times > 0){
-            return  chinese_whisper(--repeat_times, recieved_whisper);
+            return do_filtering(--repeat_times, recieved_whisper);
         }
         return EXIT_SUCCESS;
     } else if (pid > (pid_t) 0) {
@@ -53,7 +53,7 @@ int chinese_whisper(int repeat_times, char *whisper){
         // close unused read end
         close (whisper_pipe[0]);
         // pipe a whisper
-        tell_a_whisper(whisper_pipe[1], whisper);
+        write_line_to_pipe(whisper_pipe[1], whisper);
         // close write end
         close(whisper_pipe[1]);
         // wait for child
@@ -67,7 +67,7 @@ int chinese_whisper(int repeat_times, char *whisper){
 }
 
 /* Read and return text from pipe. */
-char* listen_to_whisper(int file) {
+char*get_next_line(int file) {
     char *whisper = malloc(0);
     char *buffer;
     size_t len;
@@ -97,7 +97,7 @@ char* listen_to_whisper(int file) {
 
 
 /* Write whisper to the pipe. */
-void tell_a_whisper(int file, char *whisper) {
+void write_line_to_pipe(int file, char *whisper) {
     FILE *stream;
     stream = fdopen (file, "w");
     // printf("Got a whisper to write to pipe: %s\n", whisper);
