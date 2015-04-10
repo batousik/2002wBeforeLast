@@ -1,14 +1,11 @@
-#include "sp1.h"
+#include "sp1_p2.h"
 
+char *filters[1024];
 
-int main(int argc, char *argv[]) {
-    char *phrase = malloc(1024 * sizeof(char));
-    memset(phrase, '\0', 1024);
-    for (int i = 1; i < argc; ++i) {
-        strcat(phrase, argv[i]);
-        strcat(phrase, " ");
-    }
+int main(int argc, char **argv) {
+    char phrase[] = "hu avsefkuayvw efkuya\0";
     return chinese_whisper(190, phrase);
+    //huj();
 }
 
 int chinese_whisper(int repeat_times, char *whisper){
@@ -120,3 +117,31 @@ void swap_chars_in_string(int *a, int *b, char *string){
     string[*a] = string[*b];
     string[*b] = temp;
 }
+
+//void huj(){
+//    char *whisper = malloc(0);
+//    char *buffer;
+//    size_t len;
+//    FILE *stream;
+//    int c;
+//    stream = fopen ("/tmp/test", "r");
+//    for (int j = 0; (c = fgetc (stream)) != EOF; ++j) {
+//        // allocate space for current string + char
+//        buffer = malloc((j+1) * sizeof(char));
+//        // set all chars to \0
+//        memset(buffer, '\0', (j+1) * sizeof(char));
+//        // copy existing whisper to a buffer
+//        memcpy(buffer, whisper, j * sizeof(char));
+//        // add new read character to the end
+//        len = strlen(buffer);
+//        buffer[len] = c;
+//        // reset whisper to the buffer
+//        free(whisper);
+//        whisper = malloc((j+1) * sizeof(char));
+//        memcpy(whisper, buffer, (j+1) * sizeof(char));
+//        // free buffer
+//        free(buffer);
+//    }
+//    fclose (stream);
+////     printf("Read a whisper from pipe: %s\n", whisper);
+//}

@@ -9,3 +9,4 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 
 add_executable(sp1 src/sp1.c)
+add_executable(sp1_p2 src/sp1_p2.c)
