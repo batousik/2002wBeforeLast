@@ -1,3 +1,4 @@
+#include <errno.h>
 #include "sp1_p2.h"
 
 const char * const not_string = "pcO65gAxOBzrKz3rThHUnnbXCuJwMsRP50nPbo3l8NkhtxsDMBGmQbmEEviFndMaUkwRimgHBK1bwT47BgGswlx5fVUtFcCYEHKmRIbr4mSbIDiSIAYuQ0POLgSbBXKv";
@@ -21,7 +22,6 @@ int main(int argc, char *argv[]) {
     }
 
     num_filters = argc/2;
-
     // create filters array
     // first argv is actually name of executable
     // each filter is a pointer to array[2] of char*
@@ -57,8 +57,6 @@ int main(int argc, char *argv[]) {
 
     // read stdin loop
     pid_t pid;
-    int my_pid;
-    int parent_pid = getpid();
     int phrase_pipe[2];
 
     /* Create the pipe. */
@@ -68,41 +66,36 @@ int main(int argc, char *argv[]) {
     }
     /* Create the child process. */
     pid = fork ();
-    if (pid == (pid_t) 0) {
+    if (pid == 0) {
         // Child
-        my_pid = getpid();
-        // printf("New process %i, parent %i\n", my_pid, parent_pid);
-        // close unused write end
-        // close (phrase_pipe[1]);
-        // initiate filtering
+        close(phrase_pipe[1]);
         do_filtering(0, phrase_pipe[0]);
         exit(EXIT_SUCCESS);
-    } else if (pid > (pid_t) 0) {
+    } else if (pid > 0) {
+        close(phrase_pipe[0]);
         // Parent
-        // close unused read end
-        close (phrase_pipe[0]);
-        char *filename = "test.txt";
+        char *filename = "/home/btsyrenov/ClionProjects/2002wBeforeLast/bin/test.txt";
         FILE *stream;
         stream = fopen (filename, "r");
         char *line = get_next_file_line(stream);
         // reading file and writing it to the pipe
-        while (line != EOF) {
+        while (strcmp(line, "EOF")) {
             printf("%s\n", line);
             write_line_to_pipe(phrase_pipe[1], line);
-            write_line_to_pipe(phrase_pipe[1], "\n");
             line = get_next_file_line(stream);
         }
-        fclose (stream);
+        write_line_to_pipe(phrase_pipe[1], "EOF");
+        close(phrase_pipe[1]);
+        close(phrase_pipe[0]);
+        close(stream);
         // wait for all children
         wait(NULL);
-        // close write end
-        close(phrase_pipe[1]);
-        printf("DONE");
+        printf("DONE\n");
         exit(EXIT_SUCCESS);
     } else {
         /* The fork failed. */
         fprintf (stderr, "Fork failed.\n");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
 }
 
@@ -121,66 +114,76 @@ int do_filtering(int cur_filter, int fd_read){
     }
     /* Create the child process. */
     pid = fork ();
-
     if (pid == (pid_t) 0) {
         // Child
+        close(phrase_pipe[1]);
         my_pid = getpid();
-        printf("New process %i, parent %i\n", my_pid, parent_pid);
-        // close unused write end
-       // close (phrase_pipe[1]);
-        // read from pipe
-        // char *recieved_phrase = get_next_line(phrase_pipe[0]);
-        // printf("pid:%i received string[%s]\n", my_pid, recieved_phrase);
-        // close read end
-        // close(phrase_pipe[0]);
-//        if(recieved_phrase == NULL){
-//            printf("NULL\n");
-//        }
-        if (cur_filter < (num_filters-1)){
-            return do_filtering(++cur_filter, phrase_pipe[0]);
+        printf("New process %i, parent %i, cf: %i\n", my_pid, parent_pid, cur_filter);
+        if (cur_filter < (num_filters)){
+            do_filtering(++cur_filter, phrase_pipe[0]);
         }
-        exit(EXIT_SUCCESS);
+        close(phrase_pipe[0]);
+        close(phrase_pipe[1]);
+        close(fd_read);
+
     } else if (pid > (pid_t) 0) {
+
         // Parent
-        printf("dead");
-        close (phrase_pipe[0]);
+        close(phrase_pipe[0]);
         // keep reading lines from pipe
-        char *line = get_next_line(fd_read);
-        // reading file and writing it to the pipe
-        while (line != EOF) {
-            // if filter okay, pass on the line to children
-            if (do_filter(cur_filter, line)) {
-                // if current filter worked pipe a phrase
-                write_line_to_pipe(phrase_pipe[1], line);
-                write_line_to_pipe(phrase_pipe[1], '\n');
-            }
-            line = get_next_line(fd_read);
+        FILE *stream = NULL;
+        stream = fdopen (fd_read, "r");
+        if (stream == NULL) {
+            printf("Cannot open file '%s' : %s\n", "asd", strerror(errno));
+            return 0;
         }
-        printf("dead");
+
+        char *line = get_next_line(stream);
+        // reading file and writing it to the pipe
+
+        while (strcmp(line, "EOF")) {
+            // if filter okay, pass on the line to children
+            if (cur_filter == num_filters){
+                printf("result line:                           %s", line);
+            } else {
+                if (do_filter(cur_filter, line)) {
+                    // if current filter worked pipe a phrase
+                    write_line_to_pipe(phrase_pipe[1], line);
+                }
+            }
+            line = get_next_line(stream);
+        }
         // write EOF to children
-        write_line_to_pipe (phrase_pipe[1], EOF);
+        write_line_to_pipe (phrase_pipe[1], "EOF");
         // wait for all children
-        wait(NULL);
-        exit(EXIT_SUCCESS);
+        close(stream);
+        close(phrase_pipe[1]);
+        close(phrase_pipe[0]);
+
+        wait(0);
+
     } else {
         /* The fork failed. */
         fprintf (stderr, "Fork failed.\n");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
+    exit(EXIT_SUCCESS);
 }
 
 /* Read and return text from pipe. */
-char *get_next_line(int file) {
+char *get_next_line(FILE *stream) {
     char *whisper = malloc(0);
     char *buffer;
     size_t len;
-    FILE *stream;
     int c;
-    stream = fdopen (file, "r");
+    if (stream == NULL){
+        printf("1error______________\n");
+        return "EOF";
+    }
     for (int j = 0; (c = fgetc (stream)) != '\n'; ++j) {
+        printf("A WHISPERERERERERERERE %s, %s", whisper, c);
         if(c == EOF){
-            fclose (stream);
-            return c;
+            return "EOF";
         }
         // allocate space for current string + char
         buffer = malloc((j+2) * sizeof(char));
@@ -197,8 +200,9 @@ char *get_next_line(int file) {
         memcpy(whisper, buffer, (j+2) * sizeof(char));
         // free buffer
         free(buffer);
+        printf("A WHISPERERERERERERERE %s", whisper);
     }
-    fclose (stream);
+
     return whisper;
 }
 
@@ -208,10 +212,12 @@ char *get_next_file_line(FILE *stream) {
     char *buffer;
     size_t len;
     int c;
+    if (stream == NULL)
+       return "EOF";
+
     for (int j = 0; (c = fgetc (stream)) != '\n'; ++j) {
-        if(c == EOF){
-            fclose (stream);
-            return c;
+        if(c == NULL || c == EOF){
+            return "EOF";
         }
         // allocate space for current string + char
         buffer = malloc((j+2) * sizeof(char));
@@ -237,25 +243,22 @@ char *get_next_file_line(FILE *stream) {
 void write_line_to_pipe(int file, char *whisper) {
     FILE *stream;
     stream = fdopen (file, "w");
-    // printf("Got a whisper to write to pipe: %s\n", whisper);
-    fprintf (stream, "%s", whisper);
-    fclose (stream);
+    fprintf (stream, "%s\n", whisper);
 }
 
 
 int do_filter(int cur_filter, char *phrase){
     printf("[DO FILTER]\tPid: %i, PPid: %i, cur_filter: %i, phrase: %s, filter: %s\n", getpid(), getppid(), cur_filter, phrase, filters[cur_filter][0]);
-
     if (strcmp(filters[cur_filter][0], "Contains") == 0){
-        return 1;
+        return strcmp(phrase, filters[cur_filter][1]);
     } else if (strcmp(filters[cur_filter][0], "Length") == 0){
-        return 1;
+        return strlen(phrase) == filters[cur_filter][1];
     } else if (strcmp(filters[cur_filter][0], "AtLeast") == 0){
-        return 1;
+        return strlen(phrase) >= filters[cur_filter][1];
     } else if (strcmp(filters[cur_filter][0], "No") == 0){
-        return 1;
+        return !strcmp(phrase, filters[cur_filter][1]);
     } else if (strcmp(filters[cur_filter][0], "Every") == 0){
-        return 1;
+        return main_cnt % (int) filters[cur_filter][1];
     }
     // FILTER DOESNT EXIST
     return 0;

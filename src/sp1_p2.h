@@ -7,7 +7,7 @@
 #include <sys/wait.h>
 
 int do_filtering(int repeat_times, int fd_read);
-char*get_next_line(int file);
+char *get_next_line(FILE *stream);
 void write_line_to_pipe(int file, char *whisper);
 void swap_chars_in_string(int *a, int *b, char *string);
 int do_filter(int cur_filter, char *phrase);
